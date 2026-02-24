@@ -1,0 +1,5 @@
+{
+  "name": "Audio2MIDI Converter",
+  "description": "Convert audio recordings into editable MIDI files using AI-powered transcription.",
+  "requestFramePermissions": []
+}
