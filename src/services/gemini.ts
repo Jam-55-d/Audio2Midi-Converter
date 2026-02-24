@@ -11,12 +11,18 @@ export interface MidiNote {
   type: 'melody' | 'harmony';
 }
 
-export async function transcribeAudioToMidi(audioBase64: string, mimeType: string): Promise<MidiNote[]> {
-  const model = "gemini-2.5-flash-native-audio-preview-12-2025";
+export async function transcribeAudioToMidi(audioBase64: string, mimeType: string, prioritizedInstruments: number[] = []): Promise<MidiNote[]> {
+  const model = "gemini-3-flash-preview";
   
+  const instrumentContext = prioritizedInstruments.length > 0 
+    ? `PRIORITIZED INSTRUMENTS: Focus specifically on identifying notes from these General MIDI instruments: ${prioritizedInstruments.join(', ')}. Ensure every note from these instruments is captured.`
+    : "";
+
   const prompt = `You are a world-class music transcription expert and multi-instrumentalist. 
   Analyze this audio file with extreme care and transcribe every single note you hear into a sequence of MIDI notes, identifying the specific instrument for each note.
   
+  ${instrumentContext}
+
   CRITICAL INSTRUCTIONS:
   1. Instrument Recognition: Identify the instrument for every note. Use General MIDI program numbers (1-128). 
      For example: 1 for Piano, 25 for Nylon Guitar, 33 for Acoustic Bass, 41 for Violin, 57 for Trumpet, 73 for Flute, etc.

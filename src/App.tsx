@@ -133,6 +133,7 @@ export default function App() {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [newPresetName, setNewPresetName] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [prioritizedInstruments, setPrioritizedInstruments] = useState<number[]>(Array(8).fill(1));
 
   // Load presets from localStorage
   React.useEffect(() => {
@@ -212,7 +213,7 @@ export default function App() {
       reader.readAsDataURL(file);
       const base64 = await base64Promise;
 
-      const transcribedNotes = await transcribeAudioToMidi(base64, file.type);
+      const transcribedNotes = await transcribeAudioToMidi(base64, file.type, prioritizedInstruments);
       
       if (transcribedNotes.length === 0) {
         throw new Error("No notes were detected in the audio. Try a clearer recording.");
@@ -627,6 +628,36 @@ export default function App() {
                         preload="auto"
                       />
                     )}
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-zinc-800">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Music className="w-5 h-5 text-emerald-400" />
+                    <h3 className="text-lg font-bold text-white">Instrument Prioritization</h3>
+                  </div>
+                  <p className="text-xs text-zinc-500 mb-6 uppercase tracking-widest leading-relaxed">
+                    Select up to 8 instruments to prioritize during transcription. This helps the AI focus on specific timbres and improves recognition quality for complex arrangements.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {prioritizedInstruments.map((instId, idx) => (
+                      <div key={idx} className="space-y-2">
+                        <label className="text-[10px] font-mono text-zinc-600 uppercase tracking-tighter">Slot {idx + 1}</label>
+                        <select
+                          value={instId}
+                          onChange={(e) => {
+                            const newInsts = [...prioritizedInstruments];
+                            newInsts[idx] = parseInt(e.target.value);
+                            setPrioritizedInstruments(newInsts);
+                          }}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-2 text-[11px] text-zinc-400 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all appearance-none cursor-pointer hover:border-zinc-700"
+                        >
+                          {GM_INSTRUMENTS.map(inst => (
+                            <option key={inst.id} value={inst.id}>{inst.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
