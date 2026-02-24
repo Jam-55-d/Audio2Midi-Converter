@@ -7,20 +7,35 @@ export interface MidiNote {
   startTime: number;
   duration: number;
   velocity: number;
+  instrument: number; // General MIDI program number (1-128)
+  type: 'melody' | 'harmony';
 }
 
 export async function transcribeAudioToMidi(audioBase64: string, mimeType: string): Promise<MidiNote[]> {
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-2.5-flash-native-audio-preview-12-2025";
   
-  const prompt = `Analyze this audio file and transcribe it into a sequence of MIDI notes. 
-  Identify the main melody and harmony. 
+  const prompt = `You are a world-class music transcription expert and multi-instrumentalist. 
+  Analyze this audio file with extreme care and transcribe every single note you hear into a sequence of MIDI notes, identifying the specific instrument for each note.
+  
+  CRITICAL INSTRUCTIONS:
+  1. Instrument Recognition: Identify the instrument for every note. Use General MIDI program numbers (1-128). 
+     For example: 1 for Piano, 25 for Nylon Guitar, 33 for Acoustic Bass, 41 for Violin, 57 for Trumpet, 73 for Flute, etc.
+  2. Catch ALL notes: This includes the main melody, all harmony notes, bass lines, and even subtle "ghost notes" or quick transients.
+  3. Polyphony: If multiple notes are playing at once (chords, counterpoint), transcribe all of them with accurate overlapping start times and durations.
+  4. Precision: Be extremely precise with 'startTime' and 'duration' (use at least 3 decimal places).
+  5. Pitch Accuracy: Ensure the MIDI 'pitch' (0-127) matches the frequency exactly.
+  6. Dynamics: Reflect the volume of each note in the 'velocity' (0-127).
+  7. Classification: Distinguish between 'melody' (the leading voice) and 'harmony' (supporting notes/chords).
+  
   Return a JSON array of objects, where each object has:
   - 'pitch': MIDI note number (0-127)
   - 'startTime': start time in seconds
   - 'duration': duration in seconds
-  - 'velocity': velocity (0-127, default to 80 if unsure)
+  - 'velocity': velocity (0-127)
+  - 'instrument': General MIDI program number (1-128)
+  - 'type': either 'melody' or 'harmony'
   
-  Be as precise as possible with timing and pitch.`;
+  Do not skip any sections of the audio. Transcribe the entire duration.`;
 
   const response = await ai.models.generateContent({
     model,
@@ -38,6 +53,7 @@ export async function transcribeAudioToMidi(audioBase64: string, mimeType: strin
       ],
     },
     config: {
+      systemInstruction: "You are a professional polyphonic music transcription engine capable of multi-instrument recognition. Your goal is 100% accuracy in capturing every note, its timing, its pitch, and its source instrument from the provided audio.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.ARRAY,
@@ -48,8 +64,10 @@ export async function transcribeAudioToMidi(audioBase64: string, mimeType: strin
             startTime: { type: Type.NUMBER },
             duration: { type: Type.NUMBER },
             velocity: { type: Type.INTEGER },
+            instrument: { type: Type.INTEGER },
+            type: { type: Type.STRING, enum: ['melody', 'harmony'] },
           },
-          required: ["pitch", "startTime", "duration", "velocity"],
+          required: ["pitch", "startTime", "duration", "velocity", "instrument", "type"],
         },
       },
     },

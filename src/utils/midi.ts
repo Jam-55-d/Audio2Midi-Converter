@@ -1,51 +1,83 @@
 import MidiWriter from 'midi-writer-js';
 import { MidiNote } from '../services/gemini';
 
-export function generateMidiFile(notes: MidiNote[]): string {
-  const track = new MidiWriter.Track();
+export interface MidiOptions {
+  bpm: number;
+  timeSignature: [number, number];
+  instrument: number;
+  quantize: {
+    enabled: boolean;
+    grid: number; // 4 for 1/4, 8 for 1/8, 16 for 1/16, etc.
+    strength: number; // 0 to 1 (0% to 100%)
+  };
+}
 
-  // Sort notes by start time
-  const sortedNotes = [...notes].sort((a, b) => a.startTime - b.startTime);
+function quantizeValue(value: number, gridInSeconds: number, strength: number): number {
+  const target = Math.round(value / gridInSeconds) * gridInSeconds;
+  return value + (target - value) * strength;
+}
 
-  // MIDI Writer uses ticks or durations like '4', '8', etc.
-  // We have seconds. We need to convert seconds to ticks.
-  // Default PPQ (Pulses Per Quarter Note) is usually 128 or 480.
-  // Let's assume a tempo of 120 BPM.
-  // 120 BPM = 2 beats per second.
-  // 1 beat = 0.5 seconds.
-  // If PPQ is 128, then 0.5 seconds = 128 ticks.
-  // 1 second = 256 ticks.
-  
-  const BPM = 120;
-  const TICKS_PER_SECOND = (BPM / 60) * 128; // 128 is default PPQ in midi-writer-js? 
-  // Actually midi-writer-js uses its own duration strings or ticks.
-  
-  track.setTempo(BPM);
+export function generateMidiFile(notes: MidiNote[], options: MidiOptions = { 
+  bpm: 120, 
+  timeSignature: [4, 4], 
+  instrument: 1,
+  quantize: { enabled: false, grid: 16, strength: 1 }
+}): string {
+  const BPM = options.bpm;
+  const TICKS_PER_SECOND = (BPM / 60) * 128; 
+  const gridInSeconds = options.quantize.enabled ? (60 / BPM) * (4 / options.quantize.grid) : 0;
 
-  let lastTick = 0;
+  const processedNotes = notes.map(note => {
+    if (!options.quantize.enabled) return note;
 
-  sortedNotes.forEach((note) => {
-    const startTick = Math.round(note.startTime * TICKS_PER_SECOND);
-    const durationTicks = Math.round(note.duration * TICKS_PER_SECOND);
+    const quantizedStart = quantizeValue(note.startTime, gridInSeconds, options.quantize.strength);
+    const quantizedEnd = quantizeValue(note.startTime + note.duration, gridInSeconds, options.quantize.strength);
     
-    // Calculate wait time from last note
-    // Wait time is relative to the previous event in the track
-    const waitTicks = Math.max(0, startTick - lastTick);
-
-    track.addEvent(
-      new MidiWriter.NoteEvent({
-        pitch: [note.pitch],
-        duration: `T${durationTicks}`,
-        velocity: note.velocity,
-        startTick: startTick, // Some versions support startTick directly
-      })
-    );
-    
-    // If startTick is used, we don't necessarily need wait, 
-    // but midi-writer-js often prefers sequential events or explicit startTicks.
-    // In recent versions, NoteEvent can take a 'startTick' property.
+    return {
+      ...note,
+      startTime: quantizedStart,
+      duration: Math.max(0.01, quantizedEnd - quantizedStart)
+    };
   });
 
-  const write = new MidiWriter.Writer(track);
+  // Group notes by instrument
+  const notesByInstrument = processedNotes.reduce((acc, note) => {
+    const inst = note.instrument || options.instrument;
+    if (!acc[inst]) acc[inst] = [];
+    acc[inst].push(note);
+    return acc;
+  }, {} as Record<number, MidiNote[]>);
+
+  const tracks: any[] = [];
+
+  Object.entries(notesByInstrument).forEach(([instStr, instNotes]) => {
+    const inst = parseInt(instStr);
+    const track = new MidiWriter.Track();
+    
+    track.addEvent(new MidiWriter.ProgramChangeEvent({ instrument: inst - 1 }));
+    track.setTempo(BPM);
+    track.setTimeSignature(options.timeSignature[0], options.timeSignature[1], 24, 8);
+
+    // Sort notes by start time
+    const sortedNotes = [...instNotes].sort((a, b) => a.startTime - b.startTime);
+
+    sortedNotes.forEach((note) => {
+      const startTick = Math.round(note.startTime * TICKS_PER_SECOND);
+      const durationTicks = Math.round(note.duration * TICKS_PER_SECOND);
+      
+      track.addEvent(
+        new MidiWriter.NoteEvent({
+          pitch: [note.pitch],
+          duration: `T${durationTicks}`,
+          velocity: note.velocity,
+          startTick: startTick,
+        })
+      );
+    });
+
+    tracks.push(track);
+  });
+
+  const write = new MidiWriter.Writer(tracks);
   return write.dataUri();
 }
