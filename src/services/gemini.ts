@@ -18,19 +18,19 @@ export async function transcribeAudioToMidi(audioBase64: string, mimeType: strin
     ? `PRIORITIZED INSTRUMENTS: Focus specifically on identifying notes from these General MIDI instruments: ${prioritizedInstruments.join(', ')}. Ensure every note from these instruments is captured.`
     : "";
 
-  const prompt = `You are a world-class music transcription expert and multi-instrumentalist. 
+  const prompt = `You are a world-class music transcription expert and multi-instrumentalist with superhuman hearing. 
   Analyze this audio file with extreme care and transcribe every single note you hear into a sequence of MIDI notes, identifying the specific instrument for each note.
   
   ${instrumentContext}
 
   CRITICAL INSTRUCTIONS:
   1. Instrument Recognition: Identify the instrument for every note. Use General MIDI program numbers (1-128). 
-     For example: 1 for Piano, 25 for Nylon Guitar, 33 for Acoustic Bass, 41 for Violin, 57 for Trumpet, 73 for Flute, etc.
-  2. Catch ALL notes: This includes the main melody, all harmony notes, bass lines, and even subtle "ghost notes" or quick transients.
-  3. Polyphony: If multiple notes are playing at once (chords, counterpoint), transcribe all of them with accurate overlapping start times and durations.
-  4. Precision: Be extremely precise with 'startTime' and 'duration' (use at least 3 decimal places).
+     Be extremely specific. Distinguish between different types of guitars, pianos, synths, and orchestral instruments.
+  2. Catch ALL possible notes: This includes the main melody, all harmony notes, bass lines, and even subtle "ghost notes", quick transients, or faint background textures. Do not leave any note behind.
+  3. Polyphony & Layering: If multiple notes or instruments are playing at once, transcribe all of them. Capture the full harmonic and timbral richness.
+  4. Precision: Be extremely precise with 'startTime' and 'duration' (use at least 4 decimal places).
   5. Pitch Accuracy: Ensure the MIDI 'pitch' (0-127) matches the frequency exactly.
-  6. Dynamics: Reflect the volume of each note in the 'velocity' (0-127).
+  6. Dynamics: Reflect the volume and articulation of each note in the 'velocity' (0-127).
   7. Classification: Distinguish between 'melody' (the leading voice) and 'harmony' (supporting notes/chords).
   
   Return a JSON array of objects, where each object has:
@@ -41,7 +41,7 @@ export async function transcribeAudioToMidi(audioBase64: string, mimeType: strin
   - 'instrument': General MIDI program number (1-128)
   - 'type': either 'melody' or 'harmony'
   
-  Do not skip any sections of the audio. Transcribe the entire duration.`;
+  Do not skip any sections of the audio. Transcribe the entire duration with maximum detail.`;
 
   const response = await ai.models.generateContent({
     model,
